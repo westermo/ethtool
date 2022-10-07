@@ -5235,6 +5235,73 @@ static int do_get_phy_tunable(struct cmd_context *ctx)
 		else
 			fprintf(stdout, "Fast Link Down enabled, %d msecs\n",
 				cont.msecs);
+	} else if (!strcmp(argp[0], "fast-link-up")) {
+		struct {
+			struct ethtool_tunable fld;
+			u8 on;
+		} cont;
+
+		cont.fld.cmd = ETHTOOL_PHY_GTUNABLE;
+		cont.fld.id = ETHTOOL_PHY_FAST_LINK_UP;
+		cont.fld.type_id = ETHTOOL_TUNABLE_U8;
+		cont.fld.len = 1;
+		if (send_ioctl(ctx, &cont.fld) < 0) {
+			perror("Cannot Get PHY Fast Link Up value");
+			return 87;
+		}
+
+		if (cont.on > 0)
+			fprintf(stdout, "Fast Link Up enabled\n");
+		else
+			fprintf(stdout, "Fast Link Up disabled\n");
+	} else if (!strcmp(argp[0], "fast-link-100mbit")) {
+		struct {
+			struct ethtool_tunable fl_100mbit;
+			u8 on;
+		} cont;
+
+		cont.fl_100mbit.cmd = ETHTOOL_PHY_GTUNABLE;
+		cont.fl_100mbit.id = ETHTOOL_PHY_FAST_LINK_100mbit;
+		cont.fl_100mbit.type_id = ETHTOOL_TUNABLE_U8;
+		cont.fl_100mbit.len = 1;
+		if (send_ioctl(ctx, &cont.fl_100mbit) < 0) {
+			perror("Cannot Get PHY Fast Link 100mbit value");
+			return 87;
+		}
+
+		if (cont.on > 0)
+			fprintf(stdout, "Fast Link 100mbit enabled\n");
+		else
+			fprintf(stdout, "Fast Link 100mbit disabled\n");
+	} else if (!strcmp(argp[0], "master-follower")) {
+		struct {
+			struct ethtool_tunable mf;
+			u8 mode;
+		} cont;
+
+		cont.mf.cmd = ETHTOOL_PHY_GTUNABLE;
+		cont.mf.id = ETHTOOL_PHY_MASTER_FOLLOWER_MODE;
+		cont.mf.type_id = ETHTOOL_TUNABLE_U8;
+		cont.mf.len = 1;
+		if (send_ioctl(ctx, &cont.mf) < 0) {
+			perror("Cannot Get PHY master-follower mode");
+			return 87;
+		}
+
+		switch(cont.mode) {
+		case ETHTOOL_TUNABLE_PHY_MODE_MASTER:
+			fprintf(stdout, "Master-Follower mode: master\n");
+			break;
+		case ETHTOOL_TUNABLE_PHY_MODE_FOLLOWER:
+			fprintf(stdout, "Master-Follower mode: follower\n");
+			break;
+		case ETHTOOL_TUNABLE_PHY_MODE_AUTO:
+			fprintf(stdout, "Master-Follower mode: auto\n");
+			break;
+		default:
+			fprintf(stderr, "Invalid master-follower mode: %d\n", cont.mode);
+			return 1;
+		}
 	} else if (!strcmp(argp[0], "energy-detect-power-down")) {
 		struct {
 			struct ethtool_tunable ds;
@@ -5357,6 +5424,41 @@ static int do_reset(struct cmd_context *ctx)
 	return 0;
 }
 
+static int master_follower_str_to_enum(const char *str)
+{
+	if (!strcasecmp(str, "auto"))
+		return ETHTOOL_TUNABLE_PHY_MODE_AUTO;
+	if (!strcasecmp(str, "master"))
+		return ETHTOOL_TUNABLE_PHY_MODE_MASTER;
+	if (!strcasecmp(str, "follower"))
+		return ETHTOOL_TUNABLE_PHY_MODE_FOLLOWER;
+	return -1;
+}
+
+static int parse_named_enum(struct cmd_context *ctx, const char *name, u8 *value,
+			    int (*str_to_enum)(const char *str))
+{
+	int result;
+	if (ctx->argc < 2)
+		return 0;
+
+	if (strcmp(*ctx->argp, name))
+		return 0;
+
+	result = str_to_enum(*(ctx->argp + 1));
+	if (result < 0) {
+		fprintf(stderr, "Invalid argument: %s\n", *(ctx->argp + 1));
+		exit_bad_args();
+	}
+
+	*value = result;
+
+	ctx->argc -= 2;
+	ctx->argp += 2;
+
+	return 1;
+}
+
 static int parse_named_bool(struct cmd_context *ctx, const char *name, u8 *on)
 {
 	if (ctx->argc < 2)
@@ -5430,6 +5532,10 @@ static int do_set_phy_tunable(struct cmd_context *ctx)
 	u8 ds_changed = 0, ds_has_cnt = 0, ds_enable = 0;
 	u8 fld_changed = 0, fld_enable = 0;
 	u8 fld_msecs = ETHTOOL_PHY_FAST_LINK_DOWN_ON;
+	u8 flu_changed = 0, flu_enable = 0;
+	u8 fl_100mbit_changed = 0, fl_100mbit_enable = 0;
+	u8 master_follower_changed = 0;
+	u8 master_follower_mode = ETHTOOL_TUNABLE_PHY_MODE_AUTO;
 	u8 edpd_changed = 0, edpd_enable = 0;
 	u16 edpd_tx_interval = ETHTOOL_PHY_EDPD_DFLT_TX_MSECS;
 
@@ -5441,6 +5547,14 @@ static int do_set_phy_tunable(struct cmd_context *ctx)
 		fld_changed = 1;
 		if (fld_enable)
 			parse_named_u8(ctx, "msecs", &fld_msecs);
+	} else if (parse_named_bool(ctx, "fast-link-up", &flu_enable)) {
+		flu_changed = 1;
+	} else if (parse_named_bool(ctx, "fast-link-100mbit", &fl_100mbit_enable)) {
+		fl_100mbit_changed = 1;
+	} else if (parse_named_enum(ctx, "master-follower",
+				    &master_follower_mode,
+				    master_follower_str_to_enum)) {
+		master_follower_changed = 1;
 	} else if (parse_named_bool(ctx, "energy-detect-power-down",
 				    &edpd_enable)) {
 		edpd_changed = 1;
@@ -5513,6 +5627,53 @@ static int do_set_phy_tunable(struct cmd_context *ctx)
 		err = send_ioctl(ctx, &cont.fld);
 		if (err < 0) {
 			perror("Cannot Set PHY Fast Link Down value");
+			err = 87;
+		}
+	} else if (flu_changed) {
+		struct {
+			struct ethtool_tunable flu;
+			u8 on;
+		} cont;
+
+		cont.flu.cmd = ETHTOOL_PHY_STUNABLE;
+		cont.flu.id = ETHTOOL_PHY_FAST_LINK_UP;
+		cont.flu.type_id = ETHTOOL_TUNABLE_U8;
+		cont.flu.len = 1;
+		cont.on = flu_enable;
+		err = send_ioctl(ctx, &cont.flu);
+		if (err < 0) {
+			perror("Cannot Set PHY Fast Link Up value");
+			err = 87;
+		}
+	} else if (fl_100mbit_changed) {
+		struct {
+			struct ethtool_tunable fl_100mbit;
+			u8 on;
+		} cont;
+
+		cont.fl_100mbit.cmd = ETHTOOL_PHY_STUNABLE;
+		cont.fl_100mbit.id = ETHTOOL_PHY_FAST_LINK_100mbit;
+		cont.fl_100mbit.type_id = ETHTOOL_TUNABLE_U8;
+		cont.fl_100mbit.len = 1;
+		cont.on = fl_100mbit_enable;
+		err = send_ioctl(ctx, &cont.fl_100mbit);
+		if (err < 0) {
+			perror("Cannot Set PHY Fast Link 100mbit value");
+			err = 87;
+		}
+	} else if (master_follower_changed) {
+		struct {
+			struct ethtool_tunable mfm;
+			u8 mode;
+		} cont;
+		cont.mfm.cmd = ETHTOOL_PHY_STUNABLE;
+		cont.mfm.id = ETHTOOL_PHY_MASTER_FOLLOWER_MODE;
+		cont.mfm.type_id = ETHTOOL_TUNABLE_U8;
+		cont.mfm.len = 1;
+		cont.mode = master_follower_mode;
+		err = send_ioctl(ctx, &cont.mfm);
+		if (err < 0) {
+			perror("Cannot Set PHY master-follower value");
 			err = 87;
 		}
 	} else if (edpd_changed) {
@@ -5954,6 +6115,9 @@ static const struct option args[] = {
 		.help	= "Set PHY tunable",
 		.xhelp	= "		[ downshift on|off [count N] ]\n"
 			  "		[ fast-link-down on|off [msecs N] ]\n"
+			  "		[ fast-link-up on|off ]\n"
+			  "		[ fast-link-100mbit on|off ]\n"
+			  "		[ master-follower auto|master|follower ]\n"
 			  "		[ energy-detect-power-down on|off [msecs N] ]\n"
 	},
 	{
@@ -5962,6 +6126,9 @@ static const struct option args[] = {
 		.help	= "Get PHY tunable",
 		.xhelp	= "		[ downshift ]\n"
 			  "		[ fast-link-down ]\n"
+			  "		[ fast-link-up ]\n"
+			  "		[ fast-link-100mbit ]\n"
+			  "		[ master-follower ]\n"
 			  "		[ energy-detect-power-down ]\n"
 	},
 	{
