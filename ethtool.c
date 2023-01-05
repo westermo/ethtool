@@ -1624,12 +1624,13 @@ static char *so_timestamping_labels[N_SOTS] = {
 	"hardware-raw-clock    (SOF_TIMESTAMPING_RAW_HARDWARE)",
 };
 
-#define N_TX_TYPES (HWTSTAMP_TX_ONESTEP_SYNC + 1)
+#define N_TX_TYPES (HWTSTAMP_TX_ONESTEP_P2P + 1)
 
 static char *tx_type_labels[N_TX_TYPES] = {
 	"off                   (HWTSTAMP_TX_OFF)",
 	"on                    (HWTSTAMP_TX_ON)",
 	"one-step-sync         (HWTSTAMP_TX_ONESTEP_SYNC)",
+	"one-step-p2p          (HWTSTAMP_TX_ONESTEP_P2P)",
 };
 
 #define N_RX_FILTERS (HWTSTAMP_FILTER_NTP_ALL + 1)
