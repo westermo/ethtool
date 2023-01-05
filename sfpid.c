@@ -266,6 +266,11 @@ static void sff8079_show_transceiver(const __u8 *id)
 		printf("%s Extended: 128GFC SW\n", pfx);
 	if (id[36] == 0x55)
 		printf("%s Extended: 128GFC LW\n", pfx);
+	/* Non IEEE codes */
+	/* Zero in code fields and 80km SMF length equals 10G Base-ZR */
+	if ((!id[3] && !id[4] && !id[5] && !id[6] && !id[7]
+	    && !id[8] && !id[9] && !id[10] && !id[36]) && (id[14] == 80))
+		printf("%s 10G Ethernet: 10G Base-ZR [non-std-IEEE]\n", pfx);
 }
 
 static void sff8079_show_encoding(const __u8 *id)
