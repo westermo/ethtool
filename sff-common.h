@@ -126,6 +126,13 @@
 #define  SFF8024_ENCODING_256B			0x07
 #define  SFF8024_ENCODING_PAM4			0x08
 
+#define  SFF8472_BR_NOMINAL			0x0C
+#define  SFF8472_LENGTH_SMF_KM			0x0E
+
+/* Non-standard SFP types */
+#define  SFF_BR_NOM_2_5G			0x1F
+#define  SFF_BR_NOM_10G				0x67
+
 /* Most common case: 16-bit unsigned integer in a certain unit */
 #define OFFSET_TO_U16_PTR(ptr, offset) (ptr[offset] << 8 | ptr[(offset) + 1])
 #define OFFSET_TO_U16(offset) OFFSET_TO_U16_PTR(id, offset)

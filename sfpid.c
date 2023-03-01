@@ -39,6 +39,12 @@ static void sff8079_show_connector(const __u8 *id)
 	sff8024_show_connector(id, 2);
 }
 
+static bool sfp_is_nonstandard(const __u8 *id)
+{
+	return !id[3] && !id[4] && !id[5] && !id[6] && !id[7]
+	       && !id[8] && !id[9] && !id[10] && !id[36];
+}
+
 static void sff8079_show_transceiver(const __u8 *id)
 {
 	static const char *pfx =
@@ -267,10 +273,17 @@ static void sff8079_show_transceiver(const __u8 *id)
 	if (id[36] == 0x55)
 		printf("%s Extended: 128GFC LW\n", pfx);
 	/* Non IEEE codes */
-	/* Zero in code fields and 80km SMF length equals 10G Base-ZR */
-	if ((!id[3] && !id[4] && !id[5] && !id[6] && !id[7]
-	    && !id[8] && !id[9] && !id[10] && !id[36]) && (id[14] == 80))
+	/* Identify 10G Base-ZR by length and nominal BR */
+	if (sfp_is_nonstandard(id)
+	    && id[SFF8472_BR_NOMINAL] == SFF_BR_NOM_10G
+	    && id[SFF8472_LENGTH_SMF_KM] == 80)
 		printf("%s 10G Ethernet: 10G Base-ZR [non-std-IEEE]\n", pfx);
+
+	/* Identify 2500Base-X by nominal BR */
+	if (sfp_is_nonstandard(id)
+	    && id[SFF8472_BR_NOMINAL] == SFF_BR_NOM_2_5G)
+		printf("%s 2.5G Ethernet: 2500BASE-X [non-std-IEEE]\n", pfx);
+
 }
 
 static void sff8079_show_encoding(const __u8 *id)
